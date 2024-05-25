@@ -1,0 +1,35 @@
+{
+	"Port": "3000",
+	"log": {
+		"path": "./logs/",
+		"config": {
+			"appenders": {
+				"console": {
+					"type": "console"
+				},
+				"app": {
+					"type": "dateFile",
+					"filename": "./logs/app.log",
+					"pattern": ".yyyy-MM-dd",
+					"daysToKeep": 30
+				},
+				"express": {
+					"type": "dateFile",
+					"filename": "./logs/express.log",
+					"pattern": ".yyyy-MM-dd",
+					"daysToKeep": 30
+				}
+			},
+			"categories": {
+				"default": {
+					"appenders": ["console", "app"],
+					"level": "debug"
+				},
+				"express": {
+					"appenders": ["console", "express"],
+					"level": "info"
+				}
+			}
+		}
+	}
+}
