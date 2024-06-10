@@ -46,3 +46,11 @@ create table playlist(
 );
 create index playlist_path on playlist(path);
 create index playlist_name on playlist(name);
+
+create table queue (
+    id      integer primary key not null,
+    path    text not null
+);
+create index que_id on queue(id);
+create index que_path on queue(path);
+

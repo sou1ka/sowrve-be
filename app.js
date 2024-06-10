@@ -14,7 +14,7 @@ const mpv = require('node-mpv');
 let app = express();
 let bodyParser = require('body-parser');
 
-const db = new sqlite('sowrver-test.sqlite');
+const db = new sqlite('sowrver.sqlite');
 let player = new mpv({
 	"verbose": true,
 	"audio_only": true
@@ -41,6 +41,8 @@ app.use(morgan(':remote-addr - :method :url - HTTP/:http-version" :status :res[c
 
 let server = app.listen(cfg.Port, function() {
 	logger.info("Node.js is listening to PORT:" + server.address().port);
+	logger.info("queue table is truncate.");
+	db.prepare('delete from queue').run();
 });
 
 app.use(express.static(path.join(__dirname, 'www')));
@@ -279,9 +281,68 @@ app.use("/play.json", function(req, res) {
 	}
 });
 
+app.use("/queue.json", function(req, res) {
+	let stmt = db.prepare("select * from queue order by id asc");
+	let rows = stmt.all();
+	res.json(rows);
+});
+
+app.use("/insertqueue.json", function(req, res) {
+	let param = (Object.keys(req.query).length !== 0 ? req.query : req.body);
+
+	if(param) {
+		let fullpath = path.join(param.path, (param.name || ''));
+
+		let stmt = db.prepare("select max(id) as max from queue");
+		let count = stmt.all();
+		let id = count.max + 1;
+
+		db_insert('queue', {
+			id: id,
+			path: fullpath
+		});
+
+		stmt = db.prepare("select * from queue where id = ?");
+		let rows = stmt.all(id);
+
+		res.json(rows);
+
+	} else {
+		res.json({});
+	}
+});
+
+app.use("/deletequeue.json", function(req, res) {
+	try {
+		let stmt = db.prepare("select id from queue order by id asc limit 1");
+		let ret = stmt.get();
+		let id = ret.id;
+
+		if(id > 0) {
+			db.prepare(`delete from queue where id = ${id}`).run();
+		}
+
+		res.json({
+			success: true,
+			msg: id
+		});
+
+	} catch(e) {
+		res.json({
+			success: false,
+			msg: e
+		});
+	}
+});
+
 app.use("/status.json", async function(req, res) {
 	let played = await player.getProperty('stream-path');
-	let tag = {};
+	let tag = {
+		title: '',
+		album: '',
+		artist: '',
+		track: ''
+	};
 
 	if(played) {
 		let t = await id3read(played);
@@ -291,6 +352,12 @@ app.use("/status.json", async function(req, res) {
 	res.json({
 		status: playstatus,
 		title: tag.title,
+		play: {
+			title: tag.title,
+			album: tag.album,
+			artist: tag.artist,
+			track: tag.track
+		},
 		file: await player.getProperty('stream-open-filename'),
 		path: await player.getProperty('media-title'),
 		duration: await player.getProperty('duration'),
@@ -314,7 +381,12 @@ app.use("/stream", async function(req, res) {
 
 	let id = setInterval(async function() {
 		let played = await player.getProperty('stream-path');
-		let tag = {};
+		let tag = {
+			title: '',
+			album: '',
+			artist: '',
+			track: ''
+		};
 
 		if(played) {
 			let t = await id3read(played);
@@ -324,6 +396,12 @@ app.use("/stream", async function(req, res) {
 		let data = {
 			status: playstatus,
 			title: tag.title,
+			play: {
+				title: tag.title,
+				album: tag.album,
+				artist: tag.artist,
+				track: tag.track
+			},
 			file: await player.getProperty('stream-open-filename'),
 			path: await player.getProperty('media-title'),
 			duration: await player.getProperty('duration'),
@@ -401,3 +479,23 @@ app.use("/clearloop.json", function(req, res) {
 		status: playstatus
 	});
 });
+
+app.use("/pos.json", function(req, res) {
+	player.goToPosition();
+
+	res.json({
+		msg: 'Go To Position',
+		status: playstatus
+	});
+});
+
+app.use("/mute.json", function(req, res) {
+	player.toggleMute();
+
+	res.json({
+		msg: 'Toggle Mute',
+		status: playstatus
+	});
+});
+
+
