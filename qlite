@@ -1,0 +1,481 @@
+warning: in the working copy of 'www/index.html', LF will be replaced by CRLF the next time Git touches it
+[1mdiff --git a/app.js b/app.js[m
+[1mindex 447a663..3a7c75f 100755[m
+[1m--- a/app.js[m
+[1m+++ b/app.js[m
+[36m@@ -21,6 +21,8 @@[m [mlet player = new mpv({[m
+ });[m
+ [m
+ let playstatus = '';[m
+[32m+[m[32mlet readlibstatus = '';[m[41m[m
+[32m+[m[32mconst queueTmp = "/tmp/sowrver.m3u";[m[41m[m
+ [m
+ // conpress[m
+ app.use(compression({[m
+[36m@@ -41,8 +43,10 @@[m [mapp.use(morgan(':remote-addr - :method :url - HTTP/:http-version" :status :res[c[m
+ [m
+ let server = app.listen(cfg.Port, function() {[m
+ 	logger.info("Node.js is listening to PORT:" + server.address().port);[m
+[31m-	logger.info("queue table is truncate.");[m
+[31m-	db.prepare('delete from queue').run();[m
+[32m+[m[32m//	logger.info("queue table is truncate.");[m[41m[m
+[32m+[m[32m//	db.prepare('delete from queue').run();[m[41m[m
+[32m+[m	[32mlogger.info("Initialize queue file.");[m[41m[m
+[32m+[m	[32mfs.writeFileSync(queueTmp, "");[m[41m[m
+ });[m
+ [m
+ app.use(express.static(path.join(__dirname, 'www')));[m
+[36m@@ -93,6 +97,33 @@[m [mconst db_insert = function(table, data) {[m
+ 	}[m
+ }[m
+ [m
+[32m+[m[32mconst getPlaylist = async function() {[m[41m[m
+[32m+[m	[32mreturn await player.getProperty('playlist');[m[41m[m
+[32m+[m[32m}[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32mconst getM3uStr = async function() {[m[41m[m
+[32m+[m	[32mlet list = await getPlaylist();[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mif(!list) { return null; }[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mlet line = [];[m[41m[m
+[32m+[m	[32mline.push("#EXTM3U");[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mfor(let idx = 0, size = list.length; idx < size; idx++) {[m[41m[m
+[32m+[m		[32mline.push(list[idx].filename);[m[41m[m
+[32m+[m	[32m}[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mreturn line.join("\n");[m[41m[m
+[32m+[m[32m}[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32mconst saveQueue = async function() {[m[41m[m
+[32m+[m	[32mlet txt = await getM3uStr();[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mif(!txt) { return; }[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mfs.writeFileSync(queueTmp, txt);[m[41m[m
+[32m+[m[32m}[m[41m[m
+[32m+[m[41m[m
+ // router[m
+ app.use("/lib.json", function(req, res) {[m
+ 	let stmt = db.prepare("select * from lib");[m
+[36m@@ -107,23 +138,32 @@[m [mapp.use("/insertlib.json", function(req, res) {[m
+ 		let path = param.path;[m
+ 		let recursive = param.recursive;[m
+ [m
+[31m-		let stmt = db.prepare("select count(*) from lib");[m
+[31m-		let count = stmt.all();[m
+[31m-		let id = count + 1;[m
+[32m+[m		[32mif(fs.existsSync(path)) {[m[41m[m
+[32m+[m			[32mlet stmt = db.prepare("select count(*) from lib");[m[41m[m
+[32m+[m			[32mlet count = stmt.all();[m[41m[m
+[32m+[m			[32mlet id = count + 1;[m[41m[m
+ [m
+[31m-		db_insert('lib', {[m
+[31m-			id: id,[m
+[31m-			path: path,[m
+[31m-			recursive: recursive[m
+[31m-		});[m
+[32m+[m			[32mdb_insert('lib', {[m[41m[m
+[32m+[m				[32mid: id,[m[41m[m
+[32m+[m				[32mpath: path,[m[41m[m
+[32m+[m				[32mrecursive: recursive[m[41m[m
+[32m+[m			[32m});[m[41m[m
+ [m
+[31m-		stmt = db.prepare("select * from lib where id = ?");[m
+[31m-		let rows = stmt.all(id);[m
+[32m+[m			[32mstmt = db.prepare("select * from lib where id = ?");[m[41m[m
+[32m+[m			[32mlet rows = stmt.all(id);[m[41m[m
+ [m
+[31m-		res.json(rows);[m
+[32m+[m			[32mres.json(rows);[m[41m[m
+[32m+[m[41m[m
+[32m+[m		[32m} else {[m[41m[m
+[32m+[m			[32mres.json({[m[41m[m
+[32m+[m				[32mmsg: 'Path not found.'[m[41m[m
+[32m+[m			[32m});[m[41m[m
+[32m+[m		[32m}[m[41m[m
+ [m
+ 	} else {[m
+[31m-		res.json({});[m
+[32m+[m		[32mres.json({[m[41m[m
+[32m+[m			[32mmsg: 'Parameter not found.'[m[41m[m
+[32m+[m		[32m});[m[41m[m
+ 	}[m
+ });[m
+ [m
+[36m@@ -156,6 +196,7 @@[m [mapp.use("/readlib.json", async function(req, res) {[m
+ [m
+ 			for(let d of list) {[m
+ 				logger.info('Read file: ' + d);[m
+[32m+[m				[32mreadlibstatus = 'Read file: ' + d;[m[41m[m
+ 				let fullpath = path.dirname(d);[m
+ 				let parent = fullpath.split(path.sep).pop();[m
+ 				let ext = path.extname(d);[m
+[36m@@ -206,6 +247,8 @@[m [mapp.use("/readlib.json", async function(req, res) {[m
+ [m
+ 	}[m
+ [m
+[32m+[m	[32mreadlibstatus = '';[m[41m[m
+[32m+[m[41m[m
+ 	res.json({[m
+ 		readFile: readFile,[m
+ 		count: count,[m
+[36m@@ -214,6 +257,36 @@[m [mapp.use("/readlib.json", async function(req, res) {[m
+ [m
+ });[m
+ [m
+[32m+[m[32mapp.use("/readlibstatus", async function(req, res) {[m[41m[m
+[32m+[m	[32mres.setHeader('Content-Type', 'text/event-stream');[m[41m[m
+[32m+[m	[32mres.setHeader('Connection', 'keep-alive');[m[41m[m
+[32m+[m	[32mres.setHeader('Cache-Control', 'no-cache');[m[41m[m
+[32m+[m	[32mres.flushHeaders();[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mres.write('\n');[m[41m[m
+[32m+[m	[32mres.write('event: readlibstatus\n');[m[41m[m
+[32m+[m	[32mres.write('data: Initialize\n\n');[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mlet id = setInterval(async function() {[m[41m[m
+[32m+[m		[32mif(readlibstatus == '' || readlibstatus == undefined || readlibstatus == null) {[m[41m[m
+[32m+[m		[32mres.write('data: Finalize\n\n');[m[41m[m
+[32m+[m			[32mres.end();[m[41m[m
+[32m+[m			[32mclearInterval(id);[m[41m[m
+[32m+[m			[32mreturn;[m[41m[m
+[32m+[m		[32m}[m[41m[m
+[32m+[m[41m[m
+[32m+[m[41m		[m
+[32m+[m		[32mres.write('data: ' + readlibstatus + '\n\n');[m[41m[m
+[32m+[m		[32mres.flush();[m[41m[m
+[32m+[m	[32m}, 1000);[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mreq.on('close', () => {[m[41m[m
+[32m+[m		[32mclearInterval(id);[m[41m[m
+[32m+[m		[32mres.end('OK');[m[41m[m
+[32m+[m	[32m});[m[41m[m
+[32m+[m[32m});[m[41m[m
+[32m+[m[41m[m
+[32m+[m[41m[m
+ app.use("/musics.json", function(req, res) {[m
+ 	let col = ['path', 'dir', 'name', 'like', 'tag_title', 'tag_album', 'tag_artist', 'tag_genre', 'tag_track', 'tag_year', 'tag_comment'];[m
+ 	let group = '';[m
+[36m@@ -265,9 +338,10 @@[m [mapp.use("/play.json", function(req, res) {[m
+ 		let fullpath = path.join(param.path, (param.name || ''));[m
+ 		logger.info('Play from: ' + fullpath);[m
+ [m
+[31m-		player.loadFile(fullpath);[m
+[32m+[m		[32mplayer.load(fullpath);[m[41m[m
+ 		player.play();[m
+ 		playstatus = fullpath;[m
+[32m+[m		[32msaveQueue();[m[41m[m
+ [m
+ 		res.json({[m
+ 			msg: 'play ' + param.name,[m
+[36m@@ -281,18 +355,84 @@[m [mapp.use("/play.json", function(req, res) {[m
+ 	}[m
+ });[m
+ [m
+[31m-app.use("/queue.json", function(req, res) {[m
+[31m-	let stmt = db.prepare("select * from queue order by id asc");[m
+[31m-	let rows = stmt.all();[m
+[31m-	res.json(rows);[m
+[32m+[m[32mapp.use("/loadplaylist.json", function(req, res) {[m[41m[m
+[32m+[m	[32mlet param = (Object.keys(req.query).length !== 0 ? req.query : req.body);[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mif(param) {[m[41m[m
+[32m+[m		[32mlet fullpath = path.join(param.path, (param.name || ''));[m[41m[m
+[32m+[m		[32mlogger.info('Playlists from: ' + fullpath);[m[41m[m
+[32m+[m[41m[m
+[32m+[m		[32mplayer.loadPlaylist(fullpath);[m[41m[m
+[32m+[m		[32mplayer.play();[m[41m[m
+[32m+[m		[32mplaystatus = fullpath;[m[41m[m
+[32m+[m		[32msaveQueue();[m[41m[m
+[32m+[m[41m[m
+[32m+[m		[32mres.json({[m[41m[m
+[32m+[m			[32mmsg: 'play ' + param.name,[m[41m[m
+[32m+[m	[32m//		pid: proc.pid[m[41m[m
+[32m+[m		[32m});[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32m} else {[m[41m[m
+[32m+[m		[32mres.json({[m[41m[m
+[32m+[m			[32mmsg: 'Need for parameter "path" and "name".'[m[41m[m
+[32m+[m		[32m});[m[41m[m
+[32m+[m	[32m}[m[41m[m
+ });[m
+ [m
+[31m-app.use("/insertqueue.json", function(req, res) {[m
+[32m+[m[32mapp.use("/saveplaylist.json", async function(req, res) {[m[41m[m
+ 	let param = (Object.keys(req.query).length !== 0 ? req.query : req.body);[m
+ [m
+ 	if(param) {[m
+[31m-		let fullpath = path.join(param.path, (param.name || ''));[m
+[32m+[m		[32mlet filepath = param.path;[m[41m[m
+[32m+[m		[32mlogger.info('Save Playlists from: ' + filepath);[m[41m[m
+[32m+[m		[32mlet txt = await getM3uStr();[m[41m[m
+[32m+[m[41m[m
+[32m+[m		[32mif(txt) {[m[41m[m
+[32m+[m			[32mtry {[m[41m[m
+[32m+[m				[32mfs.writeFileSync(filepath, txt);[m[41m[m
+[32m+[m[41m[m
+[32m+[m				[32mres.json({[m[41m[m
+[32m+[m					[32msuccess: true,[m[41m[m
+[32m+[m					[32mmsg: 'Save Playlist: ' + filepath[m[41m[m
+[32m+[m				[32m});[m[41m[m
+[32m+[m[41m[m
+[32m+[m			[32m} catch(e) {[m[41m[m
+[32m+[m				[32mlogger.error('ID3tag error: ' + e);[m[41m[m
+[32m+[m				[32mres.json({[m[41m[m
+[32m+[m					[32msuccess: false,[m[41m[m
+[32m+[m					[32mmsg: 'Save error: ' + e[m[41m[m
+[32m+[m				[32m});[m[41m[m
+[32m+[m			[32m}[m[41m[m
+[32m+[m[41m[m
+[32m+[m		[32m} else {[m[41m[m
+[32m+[m			[32mres.json({[m[41m[m
+[32m+[m				[32msuccess: false,[m[41m[m
+[32m+[m				[32mmsg: 'Playlist is empty.'[m[41m[m
+[32m+[m			[32m});[m[41m[m
+[32m+[m		[32m}[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32m} else {[m[41m[m
+[32m+[m		[32mres.json({[m[41m[m
+[32m+[m			[32mmsg: 'Need for parameter "filename".'[m[41m[m
+[32m+[m		[32m});[m[41m[m
+[32m+[m	[32m}[m[41m[m
+[32m+[m[32m});[m[41m[m
+ [m
+[32m+[m[32mapp.use("/queue.json", async function(req, res) {[m[41m[m
+[32m+[m	[32mres.json(await getPlaylist());[m[41m[m
+[32m+[m[32m//	let stmt = db.prepare("select * from queue order by id asc");[m[41m[m
+[32m+[m[32m//	let rows = stmt.all();[m[41m[m
+[32m+[m[32m//	res.json(rows);[m[41m[m
+[32m+[m[32m});[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32mapp.use("/insertqueue.json", async function(req, res) {[m[41m[m
+[32m+[m	[32mlet param = (Object.keys(req.query).length !== 0 ? req.query : req.body);[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mif(param) {[m[41m[m
+[32m+[m		[32mlet fullpath = path.join(param.path, (param.name || ''));[m[41m[m
+[32m+[m		[32mplayer.load(fullpath, "append");[m[41m[m
+[32m+[m		[32msaveQueue();[m[41m[m
+[32m+[m[32m/*[m[41m[m
+ 		let stmt = db.prepare("select max(id) as max from queue");[m
+ 		let count = stmt.all();[m
+ 		let id = count.max + 1;[m
+[36m@@ -304,16 +444,43 @@[m [mapp.use("/insertqueue.json", function(req, res) {[m
+ [m
+ 		stmt = db.prepare("select * from queue where id = ?");[m
+ 		let rows = stmt.all(id);[m
+[31m-[m
+[31m-		res.json(rows);[m
+[32m+[m[32m*/[m[41m[m
+[32m+[m		[32mres.json(await getPlaylist());[m[41m[m
+ [m
+ 	} else {[m
+ 		res.json({});[m
+ 	}[m
+ });[m
+ [m
+[31m-app.use("/deletequeue.json", function(req, res) {[m
+[31m-	try {[m
+[32m+[m[32mapp.use("/deletequeue.json", async function(req, res) {[m[41m[m
+[32m+[m	[32mlet param = (Object.keys(req.query).length !== 0 ? req.query : req.body);[m[41m[m
+[32m+[m	[32mlet id = -1;[m[41m[m
+[32m+[m	[32mlet idx = -1;[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mif(param) {[m[41m[m
+[32m+[m		[32mid = Number(param.id);[m[41m[m
+[32m+[m[41m[m
+[32m+[m		[32mif(id >= 0) {[m[41m[m
+[32m+[m			[32mlet list = await getPlaylist();[m[41m[m
+[32m+[m			[32midx = 0;[m[41m[m
+[32m+[m[41m[m
+[32m+[m			[32mfor(let size = list.length; idx < size; idx++) {[m[41m[m
+[32m+[m				[32mif(list[idx].id == id) {[m[41m[m
+[32m+[m					[32mplayer.playlistRemove(idx);[m[41m[m
+[32m+[m					[32mbreak;[m[41m[m
+[32m+[m				[32m}[m[41m[m
+[32m+[m			[32m}[m[41m[m
+[32m+[m		[32m}[m[41m[m
+[32m+[m[41m[m
+[32m+[m		[32msaveQueue();[m[41m[m
+[32m+[m	[32m}[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mres.json({[m[41m[m
+[32m+[m		[32mdeleteIdd: id,[m[41m[m
+[32m+[m		[32mindex: idx[m[41m[m
+[32m+[m	[32m});[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32m/*	try {[m[41m[m
+ 		let stmt = db.prepare("select id from queue order by id asc limit 1");[m
+ 		let ret = stmt.get();[m
+ 		let id = ret.id;[m
+[36m@@ -332,7 +499,7 @@[m [mapp.use("/deletequeue.json", function(req, res) {[m
+ 			success: false,[m
+ 			msg: e[m
+ 		});[m
+[31m-	}[m
+[32m+[m	[32m}*/[m[41m[m
+ });[m
+ [m
+ app.use("/status.json", async function(req, res) {[m
+[36m@@ -351,6 +518,7 @@[m [mapp.use("/status.json", async function(req, res) {[m
+ [m
+ 	res.json({[m
+ 		status: playstatus,[m
+[32m+[m		[32mplayed: played,[m[41m[m
+ 		title: tag.title,[m
+ 		play: {[m
+ 			title: tag.title,[m
+[36m@@ -365,7 +533,11 @@[m [mapp.use("/status.json", async function(req, res) {[m
+ 		timePos: await player.getProperty('time-pos'),[m
+ 		timeRemaining: await player.getProperty('time-remaining'),[m
+ 		playtimeRemaining: await player.getProperty('playtime-remaining'),[m
+[31m-		playbackTime: await player.getProperty('playback-time')[m
+[32m+[m		[32mplaybackTime: await player.getProperty('playback-time'),[m[41m[m
+[32m+[m		[32mplaylistPos: await player.getProperty('playlist-pos'),[m[41m[m
+[32m+[m		[32mplaylistPlayingPos: await player.getProperty('playlist-playing-pos'),[m[41m[m
+[32m+[m		[32mplaylistCount: await player.getProperty('playlist-count'),[m[41m[m
+[32m+[m		[32mplaylist: await player.getProperty('playlist')[m[41m[m
+ 	});[m
+ });[m
+ [m
+[36m@@ -428,6 +600,7 @@[m [mapp.use("/stream", async function(req, res) {[m
+ [m
+ app.use("/stop.json", function(req, res) {[m
+ 	player.stop();[m
+[32m+[m	[32msaveQueue();[m[41m[m
+ [m
+ 	res.json({[m
+ 		msg: 'Stop',[m
+[36m@@ -444,13 +617,38 @@[m [mapp.use("/pause.json", function(req, res) {[m
+ 	});[m
+ });[m
+ [m
+[31m-app.use("/resume.json", function(req, res) {[m
+[31m-	player.resume();[m
+[32m+[m[32mapp.use("/resume.json", async function(req, res) {[m[41m[m
+[32m+[m	[32mlet pos = await player.getProperty('playlist-pos');[m[41m[m
+ [m
+[31m-	res.json({[m
+[31m-		msg: 'Resume',[m
+[31m-		status: playstatus[m
+[31m-	});[m
+[32m+[m	[32mif(pos == -1) {[m[41m[m
+[32m+[m		[32mlet list = await getPlaylist();[m[41m[m
+[32m+[m[41m[m
+[32m+[m		[32mif(list) {[m[41m[m
+[32m+[m			[32mlet fullpath = list[0].filename;[m[41m[m
+[32m+[m			[32mplayer.loadPlaylist(queueTmp);[m[41m[m
+[32m+[m			[32mplayer.play();[m[41m[m
+[32m+[m			[32mplaystatus = fullpath;[m[41m[m
+[32m+[m[41m[m
+[32m+[m			[32mres.json({[m[41m[m
+[32m+[m				[32mmsg: 'Play',[m[41m[m
+[32m+[m				[32mstatus: playstatus[m[41m[m
+[32m+[m			[32m});[m[41m[m
+[32m+[m[41m[m
+[32m+[m		[32m} else {[m[41m[m
+[32m+[m			[32mres.json({[m[41m[m
+[32m+[m				[32mmsg: 'Empty',[m[41m[m
+[32m+[m				[32mstatus: playstatus[m[41m[m
+[32m+[m			[32m});[m[41m[m
+[32m+[m		[32m}[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32m} else {[m[41m[m
+[32m+[m		[32mplayer.resume();[m[41m[m
+[32m+[m[41m[m
+[32m+[m		[32mres.json({[m[41m[m
+[32m+[m			[32mmsg: 'Resume',[m[41m[m
+[32m+[m			[32mstatus: playstatus[m[41m[m
+[32m+[m		[32m});[m[41m[m
+[32m+[m	[32m}[m[41m[m
+ });[m
+ [m
+ app.use("/togglepause.json", function(req, res) {[m
+[36m@@ -498,4 +696,36 @@[m [mapp.use("/mute.json", function(req, res) {[m
+ 	});[m
+ });[m
+ [m
+[32m+[m[32mapp.use("/next.json", function(req, res) {[m[41m[m
+[32m+[m	[32mplayer.next();[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mres.json({[m[41m[m
+[32m+[m		[32mmsg: 'Next',[m[41m[m
+[32m+[m		[32mstatus: playstatus[m[41m[m
+[32m+[m	[32m});[m[41m[m
+[32m+[m[32m});[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32mapp.use("/prev.json", function(req, res) {[m[41m[m
+[32m+[m	[32mplayer.prev();[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mres.json({[m[41m[m
+[32m+[m		[32mmsg: 'Prev',[m[41m[m
+[32m+[m		[32mstatus: playstatus[m[41m[m
+[32m+[m	[32m});[m[41m[m
+[32m+[m[32m});[m[41m[m
+[32m+[m[41m[m
+[32m+[m[32mapp.use("/volume.json", function(req, res) {[m[41m[m
+[32m+[m	[32mlet param = (Object.keys(req.query).length !== 0 ? req.query : req.body);[m[41m[m
+[32m+[m	[32mlet vol = 50;[m[41m[m
+[32m+[m[41m[m
+[32m+[m	[32mif(param) {[m[41m[m
+[32m+[m		[32mlet vol = Number(param.volume);[m[41m[m
+[32m+[m		[32mplayer.volume(vol);[m[41m[m
+[32m+[m	[32m}[m[41m[m
+ [m
+[32m+[m	[32mres.json({[m[41m[m
+[32m+[m		[32mmsg: 'Volume',[m[41m[m
+[32m+[m		[32mvalulue: vol,[m[41m[m
+[32m+[m		[32mstatus: playstatus[m[41m[m
+[32m+[m	[32m});[m[41m[m
+[32m+[m[32m});[m[41m[m
+[1mdiff --git a/www/_app/version.json b/www/_app/version.json[m
+[1mindex 038ae52..4fac84d 100755[m
+[1m--- a/www/_app/version.json[m
+[1m+++ b/www/_app/version.json[m
+[36m@@ -1 +1 @@[m
+[31m-{"version":"1718032137651"}[m
+\ No newline at end of file[m
+[32m+[m[32m{"version":"1730016794013"}[m
+\ No newline at end of file[m
+[1mdiff --git a/www/index.html b/www/index.html[m
+[1mindex bb2fdbd..b03784c 100755[m
+[1m--- a/www/index.html[m
+[1m+++ b/www/index.html[m
+[36m@@ -5,27 +5,27 @@[m
+ 		<link rel="icon" href="/favicon.png" />[m
+ 		<meta name="viewport" content="width=device-width, initial-scale=1" />[m
+ 		[m
+[31m-		<link rel="modulepreload" href="/_app/immutable/entry/start.mSuZo-V8.js">[m
+[31m-		<link rel="modulepreload" href="/_app/immutable/chunks/entry.BD2JgUlY.js">[m
+[31m-		<link rel="modulepreload" href="/_app/immutable/chunks/scheduler.CRDwQvdD.js">[m
+[31m-		<link rel="modulepreload" href="/_app/immutable/chunks/index.CAQccbi2.js">[m
+[31m-		<link rel="modulepreload" href="/_app/immutable/entry/app.CrobMYAe.js">[m
+[31m-		<link rel="modulepreload" href="/_app/immutable/chunks/index.OVqLMCTH.js">[m
+[32m+[m		[32m<link rel="modulepreload" href="/_app/immutable/entry/start.C3ErO6OS.js">[m
+[32m+[m		[32m<link rel="modulepreload" href="/_app/immutable/chunks/entry._AlkUXDY.js">[m
+[32m+[m		[32m<link rel="modulepreload" href="/_app/immutable/chunks/scheduler.ZArbECNI.js">[m
+[32m+[m		[32m<link rel="modulepreload" href="/_app/immutable/chunks/index.CTNZO5It.js">[m
+[32m+[m		[32m<link rel="modulepreload" href="/_app/immutable/entry/app.BheJwEVG.js">[m
+[32m+[m		[32m<link rel="modulepreload" href="/_app/immutable/chunks/index.dxx6SK4n.js">[m
+ 		<title>Sowver</title>[m
+ 	</head>[m
+ 	<body data-sveltekit-preload-data="hover">[m
+ 		<div style="display: contents">[m
+ 			<script>[m
+ 				{[m
+[31m-					__sveltekit_dtkqm4 = {[m
+[32m+[m					[32m__sveltekit_1pvmkdb = {[m
+ 						base: ""[m
+ 					};[m
+ [m
+ 					const element = document.currentScript.parentElement;[m
+ [m
+ 					Promise.all([[m
+[31m-						import("/_app/immutable/entry/start.mSuZo-V8.js"),[m
+[31m-						import("/_app/immutable/entry/app.CrobMYAe.js")[m
+[32m+[m						[32mimport("/_app/immutable/entry/start.C3ErO6OS.js"),[m
+[32m+[m						[32mimport("/_app/immutable/entry/app.BheJwEVG.js")[m
+ 					]).then(([kit, app]) => {[m
+ 						kit.start(app, element);[m
+ 					});[m
