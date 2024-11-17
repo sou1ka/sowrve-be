@@ -10,6 +10,7 @@ const compression = require("compression");
 const { logger, exp } = require("./logger");
 const { spawn } = require('child_process')
 const mpv = require('node-mpv');
+const chk = require('chokidar');
 
 let app = express();
 let bodyParser = require('body-parser');
@@ -23,6 +24,7 @@ let player = new mpv({
 let playstatus = '';
 let readlibstatus = '';
 const queueTmp = "/tmp/sowrver.m3u";
+let watcher = {};
 
 // conpress
 app.use(compression({
@@ -47,6 +49,8 @@ let server = app.listen(cfg.Port, function() {
 //	db.prepare('delete from queue').run();
 	logger.info("Initialize queue file.");
 	fs.writeFileSync(queueTmp, "");
+	logger.info('Initialize file checker.');
+	initChecker();
 });
 
 app.use(express.static(path.join(__dirname, 'www')));
@@ -97,6 +101,34 @@ const db_insert = function(table, data) {
 	}
 }
 
+const db_update = function(table, data, where) {
+
+}
+
+const db_delete = function(table, where) {
+	if(!where) { return; }
+
+	let col = Object.keys(where);
+	let ws = [];
+
+	for(let nm of col) {
+		ws.push(nm + ' = ?');
+	}
+
+	let sql = 'delete from ' + table + ' where ' + ws.join(' and ');
+	let val = Object.values(where);
+	//	console.log(sql);
+	//	console.log(val);
+	try {
+		db.prepare(sql).run(val);
+	} catch(e) {
+		console.error(e);
+		console.log(sql);
+		console.log(val);
+	}
+}
+
+
 const getPlaylist = async function() {
 	return await player.getProperty('playlist');
 }
@@ -124,6 +156,140 @@ const saveQueue = async function() {
 	fs.writeFileSync(queueTmp, txt);
 }
 
+const checker = function(p) {
+	if(watcher[p]) { return; }
+
+	watcher[p] = chk.watch(p, {
+		ignored: /[\/\\]\./,
+		persistent: true
+	});
+
+	watcher[p].on('change', async function(d) {
+		await readFile(d);
+	});
+
+	watcher[p].on('unlink', function(d) {
+		logger.info('Remove file: ' + d);
+		readlibstatus = 'Remove file: ' + d;
+		let filename = path.basename(d);;
+		let fullpath = path.dirname(d);
+		let parent = fullpath.split(path.sep).pop();
+		let ext = path.extname(d);
+
+		if(ext == '.m3u') {
+			db_delete('playlist', {
+				path: parent,
+				name: fullpath
+			});
+
+		} else {
+			db_delete('file', {
+				path: fullpath,
+				dir: parent,
+				name: filename
+			});
+		}
+	});
+}
+
+const initChecker = function() {
+	let stmt = db.prepare("select * from lib");
+	let rows = stmt.all();
+
+	if(rows) {
+		for(let nm of rows) {
+			checker(nm.path);
+		}
+	}
+}
+
+const readFile = async function(d) {
+	let filename = path.basename(d);
+	let fullpath = path.dirname(d);
+	let parent = fullpath.split(path.sep).pop();
+	let ext = path.extname(d);
+
+	let stmt = db.prepare("select * from file where path = ? and dir = ? and name = ?");
+	let dat = stmt.all([fullpath, parent, filename]);
+	
+	if(!dat || dat.length >= 1) { return; }
+
+	logger.info('Read file: ' + d);
+	readlibstatus = 'Read file: ' + d;
+
+	if(ext == '.m3u') {
+		db_insert('playlist', {
+			path: parent,
+			name: fullpath
+		});
+
+	} else {
+		let tag = {};
+		try {
+			let t = await id3read(d);
+			
+			if(t && t.tags) {
+				tag = t.tags;
+			}
+		} catch(e) {
+			logger.error('ID3tag error: ' + e);
+			return;
+		}
+
+		//console.log(path.join(nm.path, list[0]));console.log(tag);console.log(list[0]);console.log(parent);console.log(nm);
+		let bin = new Uint8Array(0);
+		if(tag.picture) {
+			bin = new Uint8Array(tag.picture.data);
+		}
+
+		db_insert('file', {
+			path: fullpath,
+			dir: parent,
+			name: filename,
+			like: 0,
+			tag_title: tag.title,
+			tag_album: tag.album,
+			tag_artist: tag.artist,
+			tag_genre: tag.genre,
+			tag_track: tag.track,
+			tag_year: tag.year,
+			tag_comment: String(tag.comment || '') || null,
+			tag_cover: bin
+		});
+	}
+}
+
+const readLib = async function(rows) {
+	if(!rows) {
+		return {
+			readFile: null,
+			count: 0,
+			targets: rows
+		};
+	}
+
+	let count = 0;
+	let rFile = 0;
+
+	for(let nm of rows) {
+		let list = rfiles(nm.path);
+		rFile += list.length;
+
+		for(let d of list) {
+			count++;
+			await readFile(d);continue;
+		}
+	}
+
+	readlibstatus = '';
+
+	return {
+		readFile: rFile,
+		count: count,
+		targets: rows
+	};
+}
+
 // router
 app.use("/lib.json", function(req, res) {
 	let stmt = db.prepare("select * from lib");
@@ -139,9 +305,9 @@ app.use("/insertlib.json", function(req, res) {
 		let recursive = param.recursive;
 
 		if(fs.existsSync(path)) {
-			let stmt = db.prepare("select count(*) from lib");
-			let count = stmt.all();
-			let id = count + 1;
+			let stmt = db.prepare("select count(*) as count from lib");
+			let dat = stmt.all();
+			let id = dat[0].count + 1;
 
 			db_insert('lib', {
 				id: id,
@@ -151,12 +317,48 @@ app.use("/insertlib.json", function(req, res) {
 
 			stmt = db.prepare("select * from lib where id = ?");
 			let rows = stmt.all(id);
+			readLib(rows);
 
 			res.json(rows);
 
 		} else {
 			res.json({
 				msg: 'Path not found.'
+			});
+		}
+
+	} else {
+		res.json({
+			msg: 'Parameter not found.'
+		});
+	}
+});
+
+app.use("/deletelib.json", function(req, res) {
+	let param = (Object.keys(req.query).length !== 0 ? req.query : req.body);
+
+	if(param) {
+		let id = param.id;
+
+		if(id) {
+			let stmt = db.prepare("select * from lib where id = ?");
+			let rows = stmt.all(id);
+			let path = rows[0].path;
+			let params = [path + '%'];
+
+			stmt = db.prepare("select count(*) as count from file where path like = ?");
+			let dat = stmt.all(params);
+
+			db.prepare(`delete from file where path like ?`).run(params);
+
+			res.json({
+				id: id,
+				fileCount: dat[0].count
+			});
+
+		} else {
+			res.json({
+				msg: 'ID not found.'
 			});
 		}
 
@@ -183,77 +385,16 @@ app.use("/tag.json", async function(req, res) {
 app.use("/readlib.json", async function(req, res) {
 	let stmt = db.prepare("select * from lib");
 	let rows = stmt.all();
-	let count = 0;
-	let readFile = 0;
+	let ret = {};
 
 	if(rows) {
 		db.prepare('delete from file').run();
 		db.prepare('delete from playlist').run();
 
-		for(let nm of rows) {
-			let list = rfiles(nm.path);
-			readFile += list.length;
-
-			for(let d of list) {
-				logger.info('Read file: ' + d);
-				readlibstatus = 'Read file: ' + d;
-				let fullpath = path.dirname(d);
-				let parent = fullpath.split(path.sep).pop();
-				let ext = path.extname(d);
-				if(ext == '.m3u') {
-					db_insert('playlist', {
-						path: nm.path,
-						name: d,
-					});
-
-				} else {
-					let tag = {};
-					try {
-						let t = await id3read(d);
-						
-						if(t && t.tags) {
-							tag = t.tags;
-						}
-					} catch(e) {
-						logger.error('ID3tag error: ' + e);
-						continue;
-					}
-
-					//console.log(path.join(nm.path, list[0]));console.log(tag);console.log(list[0]);console.log(parent);console.log(nm);
-					let bin = new Uint8Array(0);
-					if(tag.picture) {
-						bin = new Uint8Array(tag.picture.data);
-					}
-
-					db_insert('file', {
-						path: fullpath,
-						dir: parent,
-						name: path.basename(d),
-						like: 0,
-						tag_title: tag.title,
-						tag_album: tag.album,
-						tag_artist: tag.artist,
-						tag_genre: tag.genre,
-						tag_track: tag.track,
-						tag_year: tag.year,
-						tag_comment: String(tag.comment || '') || null,
-						tag_cover: bin
-					});
-
-					count++;
-				}
-			}
-		}
-
+		ret = readLib(rows);
 	}
 
-	readlibstatus = '';
-
-	res.json({
-		readFile: readFile,
-		count: count,
-		targets: rows
-	});
+	res.json(ret);
 
 });
 
@@ -729,3 +870,11 @@ app.use("/volume.json", function(req, res) {
 		status: playstatus
 	});
 });
+
+app.use("/checker.json", function(req, res) {
+	res.json({
+		msg: 'Checker',
+		status: watcher
+	});
+});
+

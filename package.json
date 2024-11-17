@@ -1,24 +1,25 @@
 {
-  "name": "sowrve-be",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "better-sqlite3": "^10.0.0",
-    "compression": "^1.7.4",
-    "express": "^4.19.2",
-    "fs": "^0.0.1-security",
-    "jsmediatags": "^3.9.7",
-    "log4js": "^6.9.1",
-    "logger": "^0.0.1",
-    "morgan": "^1.10.0",
-    "node-mpv": "^1.5.0",
-    "path": "^0.12.7",
-    "serve-favicon": "^2.5.0"
-  }
+	"name": "baseapp",
+	"version": "1.0.0",
+	"license": "ISC",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"dev": "node-dev ./app.js",
+		"dev2": "node ./app.js"
+	},
+	"dependencies": {
+		"better-sqlite3": "^10.0.0",
+		"chokidar": "^4.0.1",
+		"compression": "^1.7.4",
+		"express": "^4.17.1",
+		"fs": "0.0.1-security",
+		"jsmediatags": "^3.9.7",
+		"log4js": "^6.3.0",
+		"logger": "0.0.1",
+		"morgan": "^1.10.0",
+		"node-mpv": "^1.5.0",
+		"path": "^0.12.7",
+		"serve-favicon": "^2.5.0"
+	}
 }
