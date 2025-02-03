@@ -434,6 +434,8 @@ app.use("/musics.json", function(req, res) {
 	let where = [];
 	let params = [];
 	let param = (Object.keys(req.query).length !== 0 ? req.query : req.body);
+	let page = '';
+	let count = 0;
 
 	if(param && param.search) {
 		let ps = param.search.split(/[\s|　]/g);
@@ -456,14 +458,37 @@ app.use("/musics.json", function(req, res) {
 		}
 	}
 
-	let sql = "select " + col.join(',') + " from file where {where} {group} order by tag_title asc";
+	if(param && param.limit && param.offset) {
+		let sql = "select count(*) as count from file where {where} {group} order by tag_title asc";
+		let stmt = db.prepare(sql.replace('{group}', group).replace('{where}', where.join(' or ')));
+		let rows = stmt.all(params);
+		count = rows[0].count;
+
+		page = ' limit ? offset ?';
+		params.push(param.limit);
+		params.push(param.offset);
+	}
+
+	let sql = "select " + col.join(',') + " from file where {where} {group} order by tag_title asc" + page;
 
 	console.log(where.join(' or '));
 	console.log(sql.replace('{where}', where.join(' or ')));
+	console.log(params);
 
 	let stmt = db.prepare(sql.replace('{group}', group).replace('{where}', where.join(' or ')));
 	let rows = stmt.all(params);
-	res.json(rows);
+	let ret;
+
+	if(param && param.limit && param.offset) {
+		ret = {
+			count: count,
+			rows: rows
+		};
+	} else {
+		ret = rows;
+	}
+
+	res.json(ret);
 });
 
 app.use("/playlists.json", function(req, res) {

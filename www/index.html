@@ -1,36 +1,156 @@
-<!doctype html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" href="/favicon.png" />
-		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		
-		<link rel="modulepreload" href="/_app/immutable/entry/start.D6Q1Hzmw.js">
-		<link rel="modulepreload" href="/_app/immutable/chunks/entry.DXhDAQtW.js">
-		<link rel="modulepreload" href="/_app/immutable/chunks/scheduler.ZArbECNI.js">
-		<link rel="modulepreload" href="/_app/immutable/chunks/index.CTNZO5It.js">
-		<link rel="modulepreload" href="/_app/immutable/entry/app.9UcJckxl.js">
-		<link rel="modulepreload" href="/_app/immutable/chunks/index.dxx6SK4n.js">
-		<title>Sowver</title>
-	</head>
-	<body data-sveltekit-preload-data="hover">
-		<div style="display: contents">
-			<script>
-				{
-					__sveltekit_1imx642 = {
-						base: ""
-					};
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<link rel="icon" type="image/svg+xml" href="./favicon.ico" />
+<meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+<title>SOWRVER <SoUNd seRVER></title>
+<link href="./css/bootstrap.min.css" rel="stylesheet" />
+<link href="./css/shards.min.css" rel="stylesheet" />
+<script src="./js/jquery-3.4.1.min.js"></script>
+<script src="./js/jquery.sse.min.js"></script>
+<!--<script src="./js/popper.min.js"></script>-->
+<script src="./js/bootstrap.min.js"></script>
+<script src="./js/shards.min.js"></script>
+<script src="./js/dateformat.js"></script>
 
-					const element = document.currentScript.parentElement;
+<style>
 
-					Promise.all([
-						import("/_app/immutable/entry/start.D6Q1Hzmw.js"),
-						import("/_app/immutable/entry/app.9UcJckxl.js")
-					]).then(([kit, app]) => {
-						kit.start(app, element);
-					});
-				}
-			</script>
-		</div>
-	</body>
+body {
+	background: #eaeaea;
+	display: flex;
+	flex-direction: column;
+	min-height: 100vh;
+}
+
+footer {
+	margin-top: auto;
+}
+
+.container {
+	width: auto;
+	max-width: 680px;
+	padding: 0 15px;
+}
+
+.footer {
+	background-color: #f5f5f5;
+}
+
+.overlay {
+	position: relative;
+}
+
+.overlay::before {
+	content: "";
+	position: absolute;
+	width: 100%;
+	height: 100%;
+	top: 0;
+	left: 0;
+	background: linear-gradient(to bottom, transparent, transparent, #000000);
+}
+
+.carousel p, .carousel h5 {
+	text-shadow: 0 2px 3px rgba(255, 255, 255, 0.5);
+}
+
+@media (prefers-color-scheme: dark) {
+
+html {
+	filter: invert(1) hue-rotate(180deg);
+}
+
+iframe, img, object * {
+	filter: invert(1) hue-rotate(180deg);
+}
+
+.carousel div, .carousel span, .carousel li, .overlay, .overlay::before {
+	filter: invert(1) hue-rotate(180deg);
+}
+
+}
+</style>
+</head>
+
+<body class="d-flex flex-column h-100">
+
+<main role="main" class="flex-shrink-0">
+<div class="container">
+<h1 class="mt-5"><img src="./favicon.png" width="56" height="56" style="vertical-align: sub;" /> SOWRVER</h1>
+<p class="font-weight-bold">Play music on the music server.<br />Select design theme.</p>
+
+<div id="carouselExampleIndicators" class="carousel slide" data-ride="carousel">
+  <ol class="carousel-indicators">
+    <li data-target="#carouselExampleIndicators" data-slide-to="0" class="active"></li>
+    <li data-target="#carouselExampleIndicators" data-slide-to="1"></li>
+  </ol>
+  <div class="carousel-inner">
+    <div class="carousel-item active overlay">
+      <a href="./carbon/"><img class="d-block w-100" src="./design/carbon.png" alt="Carbon" /></a>
+      <div class="carousel-caption d-none d-md-block">
+        <h5 class="text-white">Carbon</h5>
+        <p>Design for Carbon Components Svelte. https://carbon-components-svelte.onrender.com/</p>
+      </div>
+    </div>
+    <div class="carousel-item overlay">
+      <a href="./flowbite/"><img class="d-block w-100" src="./design/flowbite.png" alt="flowbite" /></a>
+      <div class="carousel-caption d-none d-md-block">
+        <h5 class="text-white">Flowbite</h5>
+        <p>Design for Flowbite. https://flowbite.com/ and Tailwind CSS https://tailwindcss.com/</p>
+      </div>
+    </div>
+  </div>
+  <a class="carousel-control-prev" href="#carouselExampleIndicators" role="button" data-slide="prev">
+    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+    <span class="sr-only">Previous</span>
+  </a>
+  <a class="carousel-control-next" href="#carouselExampleIndicators" role="button" data-slide="next">
+    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+    <span class="sr-only">Next</span>
+  </a>
+</div>
+
+<!--
+<hr />
+
+<div class="row">
+  <div class="col-sm-6">
+    <div class="card">
+      <img class="card-img-top" src="./design/carbon.png" alt="Carbon" width="600" />
+      <div class="card-body">
+        <h4 class="card-title">Carbon</h4>
+        <p class="card-text">Design for Carbon Components Svelte. https://carbon-components-svelte.onrender.com/</p>
+        <a href="./carbon/" class="btn btn-primary">Access &rarr;</a>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6">
+    <div class="card">
+      <img class="card-img-top" src="./design/flowbite.png" alt="Flowbite" width="600" />
+      <div class="card-body">
+        <h4 class="card-title">Flowbite</h4>
+        <p class="card-text">Design for Flowbite. https://flowbite.com/ and Tailwind CSS https://tailwindcss.com/</p>
+        <a href="./flowbite/" class="btn btn-primary">Access &rarr;</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+-->
+
+
+</main>
+
+<hr />
+
+<footer class="footer mt-auto py-3">
+<div class="container">
+<span class="text-muted">Build sou1ka, SOWRVER &lt;SoUNd seRVER&gt;.</span><br />
+<span class="text-muted">Designed by Shards. https://designrevision.com/demo/shards/</span>
+</div>
+</footer>
+
+</body>
 </html>
